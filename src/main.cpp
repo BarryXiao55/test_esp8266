@@ -11,6 +11,8 @@
 
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include "config.h"
+#include "WeatherCodes.h"
 
 // Pin definitions for common ESP8266 boards
 // NodeMCU: Built-in LED on D0 (GPIO16), active LOW
