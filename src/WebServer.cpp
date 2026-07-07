@@ -23,9 +23,9 @@ void webserver_init() {
     server.on("/api/weather", HTTP_GET, [](AsyncWebServerRequest* request) {
         // 分配约 3KB 的动态 JSON（堆临时使用，请求完成后释放）
         const size_t capacity = JSON_OBJECT_SIZE(3)
-            + JSON_OBJECT_SIZE(7)
+            + JSON_OBJECT_SIZE(9)
             + JSON_ARRAY_SIZE(MAX_RECORDS)
-            + MAX_RECORDS * JSON_OBJECT_SIZE(4)
+            + MAX_RECORDS * JSON_OBJECT_SIZE(3)
             + 400;
         DynamicJsonDocument doc(capacity);
 

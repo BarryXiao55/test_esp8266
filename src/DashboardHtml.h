@@ -203,4 +203,4 @@ setInterval(fetchWeather, 30000);
 </html>
 )rawliteral";
 
-static const size_t DASHBOARD_HTML_SIZE = sizeof(DASHBOARD_HTML);
+static const size_t DASHBOARD_HTML_SIZE = sizeof(DASHBOARD_HTML) - 1;
