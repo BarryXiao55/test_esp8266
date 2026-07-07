@@ -6,14 +6,11 @@ const DB_PATH = path.join(__dirname, '..', '..', 'data', 'weather.db');
 
 let db;
 
-function initDb() {
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+function runSchema(database) {
+  database.pragma('journal_mode = WAL');
+  database.pragma('foreign_keys = ON');
 
-  db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
-  db.exec(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS sensors (
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
@@ -49,8 +46,18 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_weather_source
       ON weather_data(source);
   `);
+}
 
+function initDb() {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  db = new Database(DB_PATH);
+  runSchema(db);
   return db;
+}
+
+function setDb(database) {
+  db = database;
+  runSchema(db);
 }
 
 function getDb() {
@@ -58,4 +65,4 @@ function getDb() {
   return db;
 }
 
-module.exports = { initDb, getDb };
+module.exports = { initDb, setDb, getDb, runSchema };

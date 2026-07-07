@@ -11,6 +11,10 @@ app.use(express.json());
 initDb();
 console.log('[db] SQLite initialized');
 
+// 传感器路由
+const sensorRoutes = require('./routes/sensor');
+app.use('/api/sensor', sensorRoutes);
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
