@@ -52,13 +52,28 @@ inline const char* getWeatherLabel(int8_t code) {
 }
 
 inline const char* getWindDirLabel(uint16_t deg) {
-    if (deg < 22)  return "北";
-    if (deg < 67)  return "东北";
-    if (deg < 112) return "东";
-    if (deg < 157) return "东南";
-    if (deg < 202) return "南";
-    if (deg < 247) return "西南";
-    if (deg < 292) return "西";
-    if (deg < 337) return "西北";
-    return "北";
+    static const char W_N[] PROGMEM = "北";
+    static const char W_NE[] PROGMEM = "东北";
+    static const char W_E[] PROGMEM = "东";
+    static const char W_SE[] PROGMEM = "东南";
+    static const char W_S[] PROGMEM = "南";
+    static const char W_SW[] PROGMEM = "西南";
+    static const char W_W[] PROGMEM = "西";
+    static const char W_NW[] PROGMEM = "西北";
+
+    static char buffer[7];
+    const char* selected;
+
+    if (deg < 22)         selected = W_N;
+    else if (deg < 67)    selected = W_NE;
+    else if (deg < 112)   selected = W_E;
+    else if (deg < 157)   selected = W_SE;
+    else if (deg < 202)   selected = W_S;
+    else if (deg < 247)   selected = W_SW;
+    else if (deg < 292)   selected = W_W;
+    else if (deg < 337)   selected = W_NW;
+    else                  selected = W_N;
+
+    strcpy_P(buffer, selected);
+    return buffer;
 }

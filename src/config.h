@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#define STRINGIFY(x) #x
+
 // ---- WiFi ----
 #define WIFI_AP_NAME        "ESP-Weather-Station"
 #define WIFI_AP_PASSWORD    "weather123"
@@ -29,12 +31,10 @@
 // ---- Data Structures ----
 struct WeatherRecord {
     time_t timestamp;
-    float temp;            // C
-    float feels_like;      // C
+    float temp;            // °C
+    float feels_like;      // °C
     uint8_t humidity;      // %
     float wind_speed;      // km/h
-    uint16_t wind_dir;     // degrees
+    uint16_t wind_dir;     // 度
     int8_t weather_code;   // WMO code
 };
-
-#define STRINGIFY(x) #x
