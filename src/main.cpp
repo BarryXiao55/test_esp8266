@@ -70,6 +70,26 @@ void loop() {
 
     MDNS.update();  // 保持 mDNS 响应
 
+    // 串口命令处理
+    if (Serial.available()) {
+        String cmd = Serial.readStringUntil('\n');
+        cmd.trim();
+        if (cmd == "reset") {
+            Serial.println("[CMD] 清除 WiFi 配置并重启...");
+            WiFi.disconnect(true);
+            delay(100);
+            ESP.restart();
+        } else if (cmd == "ip") {
+            Serial.print("[CMD] IP: ");
+            Serial.println(WiFi.localIP());
+        } else if (cmd == "help") {
+            Serial.println("[CMD] 可用命令:");
+            Serial.println("  reset  - 清除 WiFi 配置，重启进入配网模式");
+            Serial.println("  ip     - 显示当前 IP 地址");
+            Serial.println("  help   - 显示此帮助");
+        }
+    }
+
     // 每60分钟同步NTP
     if (now - lastNtpSync >= NTP_INTERVAL_MS) {
         syncNtp();

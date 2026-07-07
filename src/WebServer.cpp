@@ -64,7 +64,7 @@ void webserver_init() {
         sys["free_heap"] = ESP.getFreeHeap();
         sys["rssi"]      = WiFi.RSSI();
         sys["records"]   = ring_count();
-        sys["location"]  = STRINGIFY(WEATHER_LOCATION_NAME);
+        sys["location"]  = STR(WEATHER_LOCATION_NAME);
 
         String json;
         serializeJson(doc, json);

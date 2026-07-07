@@ -2,7 +2,9 @@
 #include <cstdint>
 #include <time.h>
 
+// 双层宏展开：先展开参数中的宏，再字符串化
 #define STRINGIFY(x) #x
+#define STR(x) STRINGIFY(x)
 
 // ---- WiFi ----
 #define WIFI_AP_NAME        "ESP-Weather-Station"
@@ -12,9 +14,9 @@
 #define API_HOST            "api.open-meteo.com"
 //#define API_PORT            443   // HTTPS 默认端口，暂未使用
 #define API_URL             "/v1/forecast?latitude=" \
-                            STRINGIFY(WEATHER_LOCATION_LAT) \
+                            STR(WEATHER_LOCATION_LAT) \
                             "&longitude=" \
-                            STRINGIFY(WEATHER_LOCATION_LON) \
+                            STR(WEATHER_LOCATION_LON) \
                             "&current=temperature_2m," \
                             "relative_humidity_2m," \
                             "apparent_temperature," \
