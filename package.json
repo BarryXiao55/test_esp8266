@@ -1,0 +1,14 @@
+{
+  "name": "weather-station-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ESP8266 weather sensor + Node.js backend + Vue 3 frontend",
+  "scripts": {
+    "backend:dev": "cd backend && pnpm dev",
+    "frontend:dev": "cd frontend && pnpm dev",
+    "dev": "concurrently -n BE,FE -c blue,green \"pnpm backend:dev\" \"pnpm frontend:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

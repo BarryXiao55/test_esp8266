@@ -21,3 +21,10 @@ Thumbs.db
 
 # Scratchpad — ephemeral only
 scratchpad/
+
+# Node.js
+node_modules/
+dist/
+
+# SQLite data
+backend/data/
