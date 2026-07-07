@@ -19,6 +19,5 @@ __pycache__/
 Thumbs.db
 .DS_Store
 
-# Build artifacts
-artifacts/
+# Scratchpad (ephemeral working notes)
 scratchpad/
