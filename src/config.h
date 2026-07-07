@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <time.h>
 
 #define STRINGIFY(x) #x
 
