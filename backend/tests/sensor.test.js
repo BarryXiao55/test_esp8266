@@ -40,11 +40,6 @@ function request(app, method, path, { headers = {}, body } = {}) {
   });
 }
 
-test.beforeEach(() => {
-  const db = new Database(':memory:');
-  schema.setDb(db);
-});
-
 // ---- Tests ----
 
 test('POST /api/sensor/register creates device and returns token', async () => {
