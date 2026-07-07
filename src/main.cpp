@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
 #include <WiFiManager.h>
 #include "config.h"
 #include "RingBuffer.h"
@@ -45,17 +46,29 @@ void setup() {
     weather_init();
     webserver_init();
 
-    // 3. NTP 时间同步
+    // 3. mDNS 注册（可通过 http://esp-weather.local 访问）
+    if (MDNS.begin("esp-weather")) {
+        Serial.println("[OK] mDNS 已启动: http://esp-weather.local");
+        MDNS.addService("http", "tcp", 80);
+    } else {
+        Serial.println("[WARN] mDNS 启动失败");
+    }
+
+    // 4. NTP 时间同步
     syncNtp();
 
-    // 4. 首次数据获取
+    // 5. 首次数据获取
     doWeatherFetch();
 
-    Serial.println("\n[READY] 打开浏览器访问 http://" + WiFi.localIP().toString());
+    Serial.println("\n[READY] 打开浏览器访问:");
+    Serial.println("       http://" + WiFi.localIP().toString());
+    Serial.println("       http://esp-weather.local");
 }
 
 void loop() {
     unsigned long now = millis();
+
+    MDNS.update();  // 保持 mDNS 响应
 
     // 每60分钟同步NTP
     if (now - lastNtpSync >= NTP_INTERVAL_MS) {
