@@ -1,247 +1,124 @@
-/*
- * ESP8266 Environment Validation Sketch
- *
- * Tests core ESP8266 functionality:
- * - System information (chip ID, flash size, CPU speed)
- * - GPIO output (built-in LED blink)
- * - WiFi scan
- * - Memory info
- * - Serial communication
- */
-
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <WiFiManager.h>
+#include <Ticker.h>
 #include "config.h"
+#include "RingBuffer.h"
+#include "WeatherFetcher.h"
+#include "WebServer.h"
 #include "WeatherCodes.h"
 
-// Pin definitions for common ESP8266 boards
-// NodeMCU: Built-in LED on D0 (GPIO16), active LOW
-// WeMos D1 Mini: Built-in LED on D4 (GPIO2), active LOW
-// ESP-01: Built-in LED on GPIO2, active LOW
-#if defined(LED_BUILTIN)
-  #define TEST_LED LED_BUILTIN
-#else
-  #define TEST_LED 2  // GPIO2 common across most boards
-#endif
+// ---- 调度状态 ----
+static unsigned long lastWeatherFetch = 0;
+static unsigned long lastNtpSync = 0;
+static bool ntpSynced = false;
 
-// Forward declarations
-void printSystemInfo();
-void testBlink();
-void testWiFiScan();
-void printMemoryInfo();
+// ---- 函数声明 ----
+void syncNtp();
+void doWeatherFetch();
 
 void setup() {
-  Serial.begin(115200);
-  Serial.setTimeout(5000);
+    Serial.begin(115200);
+    Serial.println();
+    Serial.println("===================================");
+    Serial.println("  ESP8266 Weather Station v1.0");
+    Serial.println("===================================");
 
-  // Wait for serial connection (5s timeout for debug)
-  unsigned long start = millis();
-  while (!Serial && (millis() - start < 5000)) {
-    delay(100);
-  }
+    // 提升 CPU 频率加速 SSL
+    system_update_cpu_freq(160);
 
-  Serial.println();
-  Serial.println("=========================================");
-  Serial.println("  ESP8266 Environment Validation Sketch");
-  Serial.println("=========================================");
-  Serial.println();
+    // 1. WiFiManager 配网
+    WiFiManager wm;
+    wm.setConfigPortalTimeout(180);
+    wm.setConnectTimeout(15);
 
-  // Init LED
-  pinMode(TEST_LED, OUTPUT);
-  digitalWrite(TEST_LED, HIGH);  // off (active LOW)
+    bool connected = wm.autoConnect(WIFI_AP_NAME, WIFI_AP_PASSWORD);
+    if (!connected) {
+        Serial.println("[ERR] WiFi 配网失败，重启...");
+        ESP.restart();
+    }
+    Serial.print("[OK] WiFi 已连接: ");
+    Serial.println(WiFi.SSID());
+    Serial.print("    IP 地址: ");
+    Serial.println(WiFi.localIP());
 
-  // Run tests
-  printSystemInfo();
-  testBlink();
-  printMemoryInfo();
-  testWiFiScan();
+    // 2. 初始化学组件
+    ring_init();
+    weather_init();
+    webserver_init();
 
-  Serial.println();
-  Serial.println("=== All tests completed! ===");
-  Serial.println("Entering main loop (LED heartbeat)...");
+    // 3. NTP 时间同步
+    syncNtp();
+
+    // 4. 首次数据获取
+    doWeatherFetch();
+
+    Serial.println("\n[READY] 打开浏览器访问 http://" + WiFi.localIP().toString());
 }
 
 void loop() {
-  // Heartbeat blink
-  digitalWrite(TEST_LED, LOW);   // ON
-  delay(200);
-  digitalWrite(TEST_LED, HIGH);  // OFF
-  delay(1800);
+    unsigned long now = millis();
 
-  // Keep printing something periodically so we know it's alive
-  static unsigned long lastPrint = 0;
-  if (millis() - lastPrint > 10000) {
-    lastPrint = millis();
-    Serial.print("[");
-    Serial.print(millis() / 1000);
-    Serial.println("s] System running...");
-  }
-}
-
-// ====================================================================
-// Test 1: System Information
-// ====================================================================
-void printSystemInfo() {
-  Serial.println("[TEST] System Information");
-  Serial.println("------------------------");
-
-  // Chip info
-  Serial.print("  Chip ID          : 0x");
-  Serial.print(ESP.getChipId(), HEX);
-  Serial.print(" (");
-  Serial.print(ESP.getChipId());
-  Serial.println(")");
-
-  Serial.print("  CPU Frequency    : ");
-  Serial.print(ESP.getCpuFreqMHz());
-  Serial.println(" MHz");
-
-  Serial.print("  SDK Version      : ");
-  Serial.println(ESP.getSdkVersion());
-
-  Serial.print("  Core Version     : ");
-  Serial.println(ESP.getCoreVersion());
-
-  Serial.print("  Boot Version     : ");
-  Serial.println(ESP.getBootVersion());
-
-  Serial.print("  Boot Mode        : ");
-  Serial.println(ESP.getBootMode());
-
-  // Flash info
-  Serial.print("  Flash Chip ID    : 0x");
-  Serial.println(ESP.getFlashChipId(), HEX);
-
-  Serial.print("  Flash Size       : ");
-  Serial.print(ESP.getFlashChipRealSize() / 1024);
-  Serial.println(" KB");
-
-  Serial.print("  Flash Speed      : ");
-  Serial.print(ESP.getFlashChipSpeed() / 1000000);
-  Serial.println(" MHz");
-
-  Serial.print("  Flash Mode       : ");
-  Serial.println(ESP.getFlashChipMode());
-
-  // Unique MAC
-  uint8_t mac[6];
-  WiFi.macAddress(mac);
-  Serial.print("  MAC Address      : ");
-  for (int i = 0; i < 6; i++) {
-    if (i > 0) Serial.print(":");
-    Serial.print(mac[i], HEX);
-  }
-  Serial.println();
-
-  // Reset reason
-  Serial.print("  Reset Reason     : ");
-  Serial.println(ESP.getResetReason());
-
-  // Free sketch space
-  Serial.print("  Sketch Size      : ");
-  Serial.print(ESP.getSketchSize());
-  Serial.print(" bytes (used: ");
-  Serial.print((ESP.getSketchSize() * 100) / ESP.getFlashChipRealSize());
-  Serial.println("%)");
-
-  Serial.println();
-}
-
-// ====================================================================
-// Test 2: GPIO Blink Test
-// ====================================================================
-void testBlink() {
-  Serial.println("[TEST] GPIO Blink (LED on pin " + String(TEST_LED) + ")");
-  Serial.println("  Blinking 5 times...");
-
-  for (int i = 0; i < 5; i++) {
-    digitalWrite(TEST_LED, LOW);   // ON
-    delay(150);
-    digitalWrite(TEST_LED, HIGH);  // OFF
-    delay(150);
-  }
-
-  Serial.println("  [PASS] GPIO output works");
-  Serial.println();
-}
-
-// ====================================================================
-// Test 3: Memory Information
-// ====================================================================
-void printMemoryInfo() {
-  Serial.println("[TEST] Memory Information");
-  Serial.println("-----------------------");
-
-  Serial.print("  Free Heap         : ");
-  Serial.print(ESP.getFreeHeap());
-  Serial.println(" bytes");
-
-  Serial.print("  Max Free Block    : ");
-  Serial.print(ESP.getMaxFreeBlockSize());
-  Serial.println(" bytes");
-
-  Serial.print("  Heap Fragmentation: ");
-  Serial.print(ESP.getHeapFragmentation());
-  Serial.println("%");
-
-  Serial.print("  Free Stack        : ");
-  Serial.print(ESP.getFreeContStack());
-  Serial.println(" bytes");
-
-  // Note: ESP8266 has no PSRAM (unlike ESP32)
-
-  Serial.println();
-}
-
-// ====================================================================
-// Test 4: WiFi Scan
-// ====================================================================
-void testWiFiScan() {
-  Serial.println("[TEST] WiFi Networks Scan");
-  Serial.println("  Scanning...");
-
-  // Set WiFi to station mode and disconnect
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  delay(100);
-
-  int networks = WiFi.scanNetworks();
-  Serial.print("  Found ");
-  Serial.print(networks);
-  Serial.println(" networks");
-
-  if (networks > 0) {
-    Serial.println();
-    Serial.println("  Networks:");
-    Serial.println("  #  SSID                              RSSI   CH  Enc");
-    Serial.println("  -- --------------------------------- ------ ---  ---");
-
-    for (int i = 0; i < networks && i < 10; i++) {
-      char buf[40];
-      String ssid = WiFi.SSID(i);
-      ssid.toCharArray(buf, 39);
-
-      Serial.print("  ");
-      if (i < 9) Serial.print(" ");
-      Serial.print(i + 1);
-      Serial.print(" ");
-      Serial.print(buf);
-      for (int s = ssid.length(); s < 33; s++) Serial.print(" ");
-
-      Serial.print(" ");
-      Serial.print(WiFi.RSSI(i));
-      Serial.print(" dBm");
-
-      Serial.print("  ");
-      Serial.print(WiFi.channel(i));
-      if (WiFi.channel(i) < 10) Serial.print(" ");
-
-      Serial.print("  ");
-      Serial.println(WiFi.encryptionType(i) == AUTH_OPEN ? "OPEN" : "YES");
+    // 每60分钟同步NTP
+    if (now - lastNtpSync >= NTP_INTERVAL_MS) {
+        syncNtp();
+        lastNtpSync = now;
     }
-    Serial.println("  (showing max 10 networks)");
-  }
 
-  Serial.println("  [PASS] WiFi radio functional");
-  Serial.println();
+    // 每10分钟获取天气数据
+    if (now - lastWeatherFetch >= WEATHER_INTERVAL_MS) {
+        doWeatherFetch();
+        lastWeatherFetch = now;
+    }
+
+    // ESP8266 喂狗（硬件WDT自动运行，但保持loop不太忙）
+    yield();
+    delay(10);
+}
+
+void syncNtp() {
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    configTime(TZ_OFFSET, 0, "ntp.aliyun.com", "ntp.ntsc.ac.cn", "time.nist.gov");
+    Serial.print("[NTP] 同步时间...");
+
+    time_t now = time(nullptr);
+    int retries = 20;
+    while (now < 100000 && retries-- > 0) {
+        delay(500);
+        now = time(nullptr);
+    }
+
+    if (now > 100000) {
+        ntpSynced = true;
+        Serial.print(" OK: ");
+        Serial.println(ctime(&now));
+    } else {
+        Serial.println(" 失败 (使用 unix epoch)");
+    }
+}
+
+void doWeatherFetch() {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("[WARN] WiFi 未连接，跳过获取");
+        return;
+    }
+
+    Serial.print("[WEATHER] 获取数据... ");
+    WeatherRecord rec;
+    bool ok = weather_fetch(&rec);
+
+    if (ok) {
+        ring_push(rec);
+        Serial.print("OK: ");
+        Serial.print(rec.temp);
+        Serial.print("°C, ");
+        Serial.print(rec.humidity);
+        Serial.print("%, ");
+        Serial.println(getWeatherLabel(rec.weather_code));
+    } else {
+        Serial.println("失败 (将在 30s 后重试)");
+        // 设置提前重试
+        lastWeatherFetch = millis() - (WEATHER_INTERVAL_MS - RETRY_DELAY_MS);
+    }
 }
