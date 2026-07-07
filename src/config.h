@@ -10,7 +10,7 @@
 
 // ---- Open-Meteo API ----
 #define API_HOST            "api.open-meteo.com"
-#define API_PORT            443
+//#define API_PORT            443   // HTTPS 默认端口，暂未使用
 #define API_URL             "/v1/forecast?latitude=" \
                             STRINGIFY(WEATHER_LOCATION_LAT) \
                             "&longitude=" \

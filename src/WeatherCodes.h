@@ -43,12 +43,17 @@ static const WeatherCodeEntry WEATHER_CODES[] PROGMEM = {
 static constexpr int WEATHER_CODE_COUNT = sizeof(WEATHER_CODES) / sizeof(WEATHER_CODES[0]);
 
 inline const char* getWeatherLabel(int8_t code) {
+    static char buffer[16];
     for (int i = 0; i < WEATHER_CODE_COUNT; i++) {
         WeatherCodeEntry entry;
         memcpy_P(&entry, &WEATHER_CODES[i], sizeof(WeatherCodeEntry));
-        if (entry.code == code) return entry.label;
+        if (entry.code == code) {
+            strcpy_P(buffer, entry.label);
+            return buffer;
+        }
     }
-    return "❓ 未知";
+    strcpy_P(buffer, PSTR("❓ 未知"));
+    return buffer;
 }
 
 inline const char* getWindDirLabel(uint16_t deg) {

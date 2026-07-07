@@ -7,6 +7,8 @@
 static BearSSL::WiFiClientSecure client;
 
 void weather_init() {
+    // setInsecure() 跳过证书验证（演示项目权衡）
+    // 生产环境应使用 setFingerprint() 或 setTrustAnchors()
     client.setInsecure();
     client.setBufferSizes(1024, 512);  // MFLN: 接收缓冲从16KB→512B
 }

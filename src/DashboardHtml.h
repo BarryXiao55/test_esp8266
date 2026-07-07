@@ -203,4 +203,5 @@ setInterval(fetchWeather, 30000);
 </html>
 )rawliteral";
 
+// sizeof 包含 PROGMEM 字符串的 null 终止符，-1 排除它以得到纯内容长度
 static const size_t DASHBOARD_HTML_SIZE = sizeof(DASHBOARD_HTML) - 1;

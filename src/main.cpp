@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
-#include <Ticker.h>
 #include "config.h"
 #include "RingBuffer.h"
 #include "WeatherFetcher.h"
@@ -11,7 +10,6 @@
 // ---- 调度状态 ----
 static unsigned long lastWeatherFetch = 0;
 static unsigned long lastNtpSync = 0;
-static bool ntpSynced = false;
 
 // ---- 函数声明 ----
 void syncNtp();
@@ -90,7 +88,6 @@ void syncNtp() {
     }
 
     if (now > 100000) {
-        ntpSynced = true;
         Serial.print(" OK: ");
         Serial.println(ctime(&now));
     } else {
@@ -104,11 +101,14 @@ void doWeatherFetch() {
         return;
     }
 
+    static uint8_t retryCount = 0;
+
     Serial.print("[WEATHER] 获取数据... ");
     WeatherRecord rec;
     bool ok = weather_fetch(&rec);
 
     if (ok) {
+        retryCount = 0;
         ring_push(rec);
         Serial.print("OK: ");
         Serial.print(rec.temp);
@@ -117,8 +117,14 @@ void doWeatherFetch() {
         Serial.print("%, ");
         Serial.println(getWeatherLabel(rec.weather_code));
     } else {
-        Serial.println("失败 (将在 30s 后重试)");
-        // 设置提前重试
-        lastWeatherFetch = millis() - (WEATHER_INTERVAL_MS - RETRY_DELAY_MS);
+        retryCount++;
+        if (retryCount >= 3) {
+            retryCount = 0;
+            Serial.println("失败 (3次重试结束，等待下一周期)");
+            // 不修改 lastWeatherFetch，自然等到下一周期
+        } else {
+            lastWeatherFetch = millis() - (WEATHER_INTERVAL_MS - RETRY_DELAY_MS);
+            Serial.printf("失败 (30s后重试 %d/3)\n", retryCount);
+        }
     }
 }
