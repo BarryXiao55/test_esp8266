@@ -26,7 +26,7 @@ bool uploadToBackend(const WeatherRecord& rec);
 // ==========================================
 //  WMO Weather Code → 中文标签
 // ==========================================
-static const char WEATHER_LABELS[][16] PROGMEM = {
+static const char WEATHER_LABELS[][32] PROGMEM = {
     // index 0-9
     "\xe2\x98\x80\xef\xb8\x8f \xe6\x99\xb4",
     "\xf0\x9f\x8c\xa4\xef\xb8\x8f \xe5\xa4\xa7\xe9\x83\xa8\xe6\x99\xb4",
@@ -64,7 +64,7 @@ static const char WEATHER_LABELS[][16] PROGMEM = {
 };
 
 const char* getWeatherLabel(int8_t code) {
-    static char buf[16];
+    static char buf[32];
     if (code >= 0 && code < (int)(sizeof(WEATHER_LABELS) / sizeof(WEATHER_LABELS[0]))
         && strlen_P(WEATHER_LABELS[code]) > 0) {
         strcpy_P(buf, WEATHER_LABELS[code]);
@@ -126,7 +126,7 @@ void setup() {
     Serial.print("       后端地址: http://");
     Serial.print(BACKEND_HOST);
     Serial.print(":");
-    Serial.println(STRINGIFY(BACKEND_PORT));
+    Serial.println(STR(BACKEND_PORT));
 }
 
 // ==========================================
@@ -303,7 +303,7 @@ String registerDevice() {
     HTTPClient http;
     http.setTimeout(5000);
 
-    String url = String("http://") + BACKEND_HOST + ":" + STRINGIFY(BACKEND_PORT) + "/api/sensor/register";
+    String url = String("http://") + BACKEND_HOST + ":" + STR(BACKEND_PORT) + "/api/sensor/register";
     http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
 
@@ -334,7 +334,7 @@ bool uploadToBackend(const WeatherRecord& rec) {
     HTTPClient http;
     http.setTimeout(5000);
 
-    String url = String("http://") + BACKEND_HOST + ":" + STRINGIFY(BACKEND_PORT) + "/api/sensor/data";
+    String url = String("http://") + BACKEND_HOST + ":" + STR(BACKEND_PORT) + "/api/sensor/data";
     http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("Authorization", "Bearer " + g_token);
