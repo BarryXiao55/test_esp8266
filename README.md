@@ -1,108 +1,189 @@
-# ESP8266 Test Project
+# Weather Station — ESP8266 天气站
+
+基于 ESP8266 的实时天气数据采集与展示系统，提供两种部署方案。
 
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-6.1+-orange)](https://platformio.org)
-[![Framework](https://img.shields.io/badge/Arduino_Core-3.1.2-blue)](https://github.com/esp8266/Arduino)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-24+-green)](https://nodejs.org)
+[![Vue](https://img.shields.io/badge/Vue-3.5-4fc08d)](https://vuejs.org)
 
-ESP8266 物联网（IoT）开发项目。基于 PlatformIO + Arduino 框架，支持 NodeMCU、WeMos D1 Mini、ESP-01 等常见 ESP8266 开发板。
+---
 
-## 硬件需求
+## 两种方案
 
-| 组件 | 说明 |
-|------|------|
-| MCU | ESP8266EX (Xtensa LX106 @ 80MHz) |
-| RAM | 80 KB（约 50 KB 可用堆空间） |
-| Flash | 4 MB SPI Flash |
-| WiFi | 802.11 b/g/n |
-| 接口 | USB-to-UART (CP2102 / CH340G) |
+| | 方案 C：一体机 | 方案 A：全栈传感器 |
+|---|---|---|
+| 分支 | `feature/weather-station-esp` | `feature/weather-station-web` |
+| ESP8266 角色 | 完整 Web 服务器 | 数据采集传感器 |
+| 存储 | 内存 Ring Buffer（断电丢失） | SQLite 持久化 |
+| 前端 | 嵌入式 Chart.js | Vue 3 + ECharts |
+| 多传感器 | ❌ | ✅ 设备注册 + token 认证 |
+| Fallback | ❌ | ✅ 传感器离线 → 后端自动接管 |
 
-## 开发环境
+---
 
-- **构建系统**: [PlatformIO](https://platformio.org) 6.1.19
-- **框架**: Arduino Core for ESP8266 3.1.2
-- **交叉编译器**: xtensa-lx106-elf-gcc 10.3.0
-- **烧录工具**: esptool.py 3.0.0
+## 方案 A：快速启动
 
-### 环境搭建
+### 前置条件
 
-```bash
-# 安装 PlatformIO
-pip install platformio
+- **Node.js** ≥ 24（LTS）
+- **pnpm** ≥ 11：`npm install -g pnpm`
+- **PlatformIO**（仅 ESP8266 固件需要）：`pip install platformio`
 
-# 验证安装
-pio --version
-
-# 检查支持的 ESP8266 开发板
-pio boards esp8266
-```
-
-## 快速开始
-
-### 编译
+### 一键启动后端 + 前端
 
 ```bash
-pio run
+# 1. 安装依赖（首次）
+pnpm install
+cd backend && pnpm install && cd ..
+cd frontend && pnpm install && cd ..
+
+# 2. 启动全部服务
+pnpm dev
 ```
 
-### 烧录固件
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| 后端 API | `http://localhost:3001` | Express + SQLite |
+| 前端 Dashboard | `http://localhost:5173` | Vue 3 + ECharts |
 
-确保 ESP8266 已通过 USB 连接并识别到串口：
+### 验证后端
 
 ```bash
-pio run --target upload
+curl http://localhost:3001/api/health
+# → {"status":"ok","ts":"..."}
 ```
 
-### 串口监视器
+### ESP8266 传感器（可选）
 
 ```bash
-pio device monitor
+cd esp8266
+
+# 1. 修改 platformio.ini 中的 BACKEND_HOST 为你的 PC IP
+#    build_flags = -DBACKEND_HOST=\"192.168.3.11\"
+
+# 2. 编译 + 烧录
+pio run -t upload
+
+# 3. 查看运行日志
+pio device monitor --baud 115200
 ```
 
-### 清理
+ESP8266 首次启动会自动进入配网模式（AP: `ESP-Weather-Station` / 密码: `weather123`），连接后通过 `192.168.4.1` 配置 WiFi。
+
+### 关闭服务
 
 ```bash
-pio run --target clean
+# 关闭后端（Ctrl+C 或）
+kill $(lsof -t -i:3001)
+
+# 关闭前端
+kill $(lsof -t -i:5173)
 ```
+
+---
+
+## 方案 C：快速启动
+
+> 分支：`feature/weather-station-esp`
+
+```bash
+git checkout feature/weather-station-esp
+
+# 编译 + 烧录
+pio run -t upload
+
+# 查看运行日志
+pio device monitor --baud 115200
+```
+
+ESP8266 一体运行：WiFiManager 配网 → Open-Meteo 获取天气 → 内嵌 Web Dashboard。
+
+访问：`http://esp-weather.local` 或 ESP8266 的 IP 地址。
+
+---
+
+## 方案 A：API 端点一览
+
+### 传感器端点
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/sensor/register` | 设备注册 `{id, name}` → `{token}` |
+| `POST` | `/api/sensor/data` | 上报天气数据（需 Bearer token） |
+
+### 天气查询
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/weather/current` | 最新天气 + 数据来源 |
+| `GET` | `/api/weather/history?from=&to=&page=&limit=` | 历史分页查询 |
+
+### 数据源控制
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/source/state` | 数据源状态 + 传感器列表 |
+| `POST` | `/api/source/switch` | 切换数据源 `{mode: "auto"|"backend"|"sensor:<id>"}` |
+| `PATCH` | `/api/source/config` | 修改 fallback 阈值 `{fallback_min}` |
+
+### 健康检查
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/health` | 服务状态 |
+
+---
 
 ## 项目结构
 
 ```
-├── src/               # 源代码
-│   └── main.cpp       # 主程序入口
-├── lib/               # 项目自定义库
-├── test/              # 单元测试
-├── Docs/              # 项目文档
-├── .claude/           # Claude Code 配置
-├── platformio.ini     # PlatformIO 板级配置
-├── CLAUDE.md          # AI 助手指令
-├── README.md          # 本文件
-└── LICENSE            # 开源许可证
+test_esp8266/
+├── esp8266/                     # 方案 A 的 ESP8266 传感器固件
+│   ├── src/
+│   │   ├── main.cpp             # 传感器主程序
+│   │   └── config.h             # 编译期配置
+│   └── platformio.ini           # PlatformIO 构建配置
+├── backend/                     # Node.js + Express + SQLite
+│   ├── src/
+│   │   ├── index.js             # Express 入口
+│   │   ├── routes/              # API 路由
+│   │   ├── services/            # 天气拉取 + fallback 监控
+│   │   ├── db/                  # SQLite schema + queries
+│   │   └── middleware/          # token 认证
+│   └── tests/                   # 22 个集成测试
+├── frontend/                    # Vue 3 + ECharts
+│   └── src/
+│       ├── views/               # 概览 / 历史 / 设置
+│       ├── components/          # 卡片 / 图表 / 来源标签
+│       ├── stores/              # Pinia 状态管理
+│       └── router/              # Vue Router
+├── artifacts/                   # 设计文档 + 计划 + 测试笔记
+├── package.json                 # monorepo 根（pnpm dev 一键启动）
+└── README.md                    # 本文件
 ```
 
-## 开发板配置
+---
 
-当前配置为 **NodeMCU 1.0 (ESP-12E)**，在 `platformio.ini` 中可切换：
+## 运行测试
 
-```ini
-[env:nodemcuv2]
-platform = espressif8266
-board = nodemcuv2       ; 改为 d1_mini / esp01_1m 等
-framework = arduino
-monitor_speed = 115200
-upload_speed = 921600
+```bash
+# 后端测试（22 个）
+cd backend && node --test tests/db.test.js
+node --test tests/sensor.test.js
+node --test tests/weather.test.js
+node --test tests/source.test.js
 ```
 
-> 查看所有支持板型：`pio boards esp8266`
+---
 
-## 验证测试
+## 架构文档
 
-首次烧录后，固件会自动执行硬件自检：
-
-- ✅ 系统信息（芯片 ID、频率、SDK 版本、Flash 大小）
-- ✅ GPIO 输出（板载 LED 闪烁）
-- ✅ 内存状态（堆使用、碎片率）
-- ✅ WiFi 射频扫描
-
-## 许可协议
-
-本项目采用 MIT 许可证 — 详见 [LICENSE](LICENSE)。
+| 文档 | 路径 |
+|------|------|
+| 技术评审 | `artifacts/weather-station-tech-review.md` |
+| 方案 C 设计 | `artifacts/weather-station-esp-design.md` |
+| 方案 C 计划 | `artifacts/weather-station-esp-plan.md` |
+| 方案 C 调试笔记 | `artifacts/weather-station-debug-lessons.md` |
+| 方案 A 设计 | `artifacts/weather-station-web-design.md` |
+| 方案 A 计划 | `artifacts/weather-station-web-plan.md` |
+| 方案 A 联调笔记 | `artifacts/weather-station-web-testing-notes.md` |
